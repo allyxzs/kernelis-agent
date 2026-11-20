@@ -1,0 +1,12 @@
+services:
+  kernelis:
+    build: .
+    container_name: kernelis-agent
+    env_file:
+      - .env
+    volumes:
+      - ./workspace:/workspace
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: ["doctor"]

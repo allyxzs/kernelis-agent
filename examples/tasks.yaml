@@ -1,0 +1,31 @@
+objective: "Auditoria básica de ambiente e criação de artefato verificado"
+steps:
+  - id: step-1
+    description: "Coletar metadados do sistema operacional"
+    tool: system
+    action: info
+    params: {}
+    verify:
+      type: json_valid
+      expected: true
+
+  - id: step-2
+    description: "Gerar arquivo de status de saúde"
+    tool: filesystem
+    action: write
+    params:
+      path: ".kernelis/health.txt"
+      content: "kernelis-ok"
+    verify:
+      type: file_exists
+      target: ".kernelis/health.txt"
+
+  - id: step-3
+    description: "Confirmar conteúdo do artefato gerado"
+    tool: filesystem
+    action: read
+    params:
+      path: ".kernelis/health.txt"
+    verify:
+      type: stdout_contains
+      expected: "kernelis-ok"
