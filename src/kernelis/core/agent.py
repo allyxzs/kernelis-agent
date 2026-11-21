@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any, Callable
 
 from kernelis.config import KernelisConfig
 from kernelis.core.memory import ExecutionMemory
@@ -35,6 +35,27 @@ class ExecutionReport:
     success: bool
     steps: list[StepExecution] = field(default_factory=list)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "objective": self.objective,
+            "success": self.success,
+            "steps": [
+                {
+                    "id": item.step.id,
+                    "description": item.step.description,
+                    "tool": item.step.tool,
+                    "action": item.step.action,
+                    "attempts": item.attempts,
+                    "exit_code": item.result.exit_code,
+                    "success": item.result.success,
+                    "error": item.result.error,
+                    "verified": item.verification.passed,
+                    "verification_message": item.verification.message,
+                }
+                for item in self.steps
+            ],
+        }
+
 
 ConfirmCallback = Callable[[PlanStep], bool]
 
@@ -57,7 +78,12 @@ class KernelisAgent:
 
     def _default_registry(self) -> ToolRegistry:
         registry = ToolRegistry()
-        registry.register(ShellTool(workdir=self.config.workdir, default_timeout=self.config.command_timeout))
+        registry.register(
+            ShellTool(
+                workdir=self.config.workdir,
+                default_timeout=self.config.command_timeout,
+            )
+        )
         registry.register(FilesystemTool(base_dir=self.config.workdir))
         registry.register(SystemTool())
         registry.register(NetworkTool())
@@ -83,26 +109,52 @@ class KernelisAgent:
                     check_type=step.verify.type,
                     message="bloqueado pela política safe",
                 )
-                executions.append(StepExecution(step=step, result=result, verification=verification, attempts=0))
+                executions.append(
+                    StepExecution(
+                        step=step,
+                        result=result,
+                        verification=verification,
+                        attempts=0,
+                    )
+                )
                 all_ok = False
-                break
+                if step.on_error == "stop":
+                    break
+                continue
 
             if self.config.policy == "confirm" and confirm_callback is not None:
                 if not confirm_callback(step):
-                    result = ToolResult(success=False, error="Etapa recusada pelo operador.", exit_code=130)
+                    result = ToolResult(
+                        success=False,
+                        error="Etapa recusada pelo operador.",
+                        exit_code=130,
+                    )
                     verification = VerificationResult(
                         passed=False,
                         check_type=step.verify.type,
                         message="cancelado pelo operador",
                     )
-                    executions.append(StepExecution(step=step, result=result, verification=verification, attempts=0))
+                    executions.append(
+                        StepExecution(
+                            step=step,
+                            result=result,
+                            verification=verification,
+                            attempts=0,
+                        )
+                    )
                     all_ok = False
-                    break
+                    if step.on_error == "stop":
+                        break
+                    continue
 
             tool = self.registry.get(step.tool)
             attempts = 0
             result = ToolResult(success=False, error="Não executado", exit_code=1)
-            verification = VerificationResult(passed=False, check_type=step.verify.type, message="não verificado")
+            verification = VerificationResult(
+                passed=False,
+                check_type=step.verify.type,
+                message="não verificado",
+            )
 
             max_attempts = max(1, self.config.max_retries + 1)
             while attempts < max_attempts:
@@ -121,11 +173,19 @@ class KernelisAgent:
                 summary=verification.message,
                 details={"attempts": attempts, "exit_code": result.exit_code},
             )
-            executions.append(StepExecution(step=step, result=result, verification=verification, attempts=attempts))
+            executions.append(
+                StepExecution(
+                    step=step,
+                    result=result,
+                    verification=verification,
+                    attempts=attempts,
+                )
+            )
 
             if not (result.success and verification.passed):
                 all_ok = False
-                break
+                if step.on_error == "stop":
+                    break
 
         return ExecutionReport(objective=plan.objective, success=all_ok, steps=executions)
 

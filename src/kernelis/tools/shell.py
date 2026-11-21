@@ -20,7 +20,7 @@ DANGEROUS_PATTERNS = [
 
 
 class ShellTool(BaseTool):
-    """Executa comandos de sistema com controle de timeout e bloqueio de comandos destrutivos."""
+    """Executa comandos de sistema com timeout e bloqueio de comandos destrutivos."""
 
     name = "shell"
     description = "Executa comandos shell com captura de stdout, stderr, exit_code e guardrails."
@@ -35,11 +35,19 @@ class ShellTool(BaseTool):
 
     def execute(self, action: str, params: dict[str, Any]) -> ToolResult:
         if action != "run":
-            return ToolResult(success=False, error=f"Ação não suportada em shell: {action}", exit_code=2)
+            return ToolResult(
+                success=False,
+                error=f"Ação não suportada em shell: {action}",
+                exit_code=2,
+            )
 
         command = str(params.get("command", "")).strip()
         if not command:
-            return ToolResult(success=False, error="Parâmetro 'command' é obrigatório.", exit_code=2)
+            return ToolResult(
+                success=False,
+                error="Parâmetro 'command' é obrigatório.",
+                exit_code=2,
+            )
 
         if self.is_dangerous(command):
             return ToolResult(
@@ -68,12 +76,13 @@ class ShellTool(BaseTool):
                 metadata={"command": command, "cwd": str(cwd)},
             )
         except subprocess.TimeoutExpired as exc:
+            out = (exc.stdout or "").strip() if isinstance(exc.stdout, str) else ""
             return ToolResult(
                 success=False,
-                output=(exc.stdout or "").strip() if isinstance(exc.stdout, str) else "",
+                output=out,
                 error=f"Timeout após {timeout}s executando: {command}",
                 exit_code=124,
                 metadata={"command": command, "timeout": timeout},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ToolResult(success=False, error=str(exc), exit_code=1)

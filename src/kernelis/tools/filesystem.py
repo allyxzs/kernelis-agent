@@ -27,7 +27,11 @@ class FilesystemTool(BaseTool):
     def execute(self, action: str, params: dict[str, Any]) -> ToolResult:
         raw_path = str(params.get("path", "")).strip()
         if not raw_path:
-            return ToolResult(success=False, error="Parâmetro 'path' é obrigatório.", exit_code=2)
+            return ToolResult(
+                success=False,
+                error="Parâmetro 'path' é obrigatório.",
+                exit_code=2,
+            )
 
         target = self._resolve_path(raw_path)
 
@@ -57,7 +61,11 @@ class FilesystemTool(BaseTool):
 
             if action == "list":
                 if not target.is_dir():
-                    return ToolResult(success=False, error=f"Não é um diretório: {target}", exit_code=1)
+                    return ToolResult(
+                        success=False,
+                        error=f"Não é um diretório: {target}",
+                        exit_code=1,
+                    )
                 entries = sorted(p.name for p in target.iterdir())
                 return ToolResult(
                     success=True,
@@ -73,6 +81,10 @@ class FilesystemTool(BaseTool):
                     metadata={"path": str(target), "sha256": digest},
                 )
 
-            return ToolResult(success=False, error=f"Ação não suportada em filesystem: {action}", exit_code=2)
-        except Exception as exc:  # noqa: BLE001
+            return ToolResult(
+                success=False,
+                error=f"Ação não suportada em filesystem: {action}",
+                exit_code=2,
+            )
+        except Exception as exc:
             return ToolResult(success=False, error=str(exc), exit_code=1)

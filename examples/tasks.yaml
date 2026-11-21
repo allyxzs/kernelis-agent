@@ -17,15 +17,6 @@ steps:
       path: ".kernelis/health.txt"
       content: "kernelis-ok"
     verify:
-      type: file_exists
+      type: file_contains
       target: ".kernelis/health.txt"
-
-  - id: step-3
-    description: "Confirmar conteúdo do artefato gerado"
-    tool: filesystem
-    action: read
-    params:
-      path: ".kernelis/health.txt"
-    verify:
-      type: stdout_contains
       expected: "kernelis-ok"

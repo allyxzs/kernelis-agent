@@ -44,7 +44,11 @@ class SystemTool(BaseTool):
             if action == "which":
                 binary = str(params.get("binary", "")).strip()
                 if not binary:
-                    return ToolResult(success=False, error="Parâmetro 'binary' é obrigatório.", exit_code=2)
+                    return ToolResult(
+                        success=False,
+                        error="Parâmetro 'binary' é obrigatório.",
+                        exit_code=2,
+                    )
                 resolved = shutil.which(binary)
                 return ToolResult(
                     success=resolved is not None,
@@ -57,7 +61,11 @@ class SystemTool(BaseTool):
             if action == "env":
                 key = str(params.get("key", "")).strip()
                 if not key:
-                    return ToolResult(success=False, error="Parâmetro 'key' é obrigatório.", exit_code=2)
+                    return ToolResult(
+                        success=False,
+                        error="Parâmetro 'key' é obrigatório.",
+                        exit_code=2,
+                    )
                 val = os.getenv(key)
                 return ToolResult(
                     success=val is not None,
@@ -66,6 +74,10 @@ class SystemTool(BaseTool):
                     metadata={"key": key, "present": val is not None},
                 )
 
-            return ToolResult(success=False, error=f"Ação não suportada em system: {action}", exit_code=2)
-        except Exception as exc:  # noqa: BLE001
+            return ToolResult(
+                success=False,
+                error=f"Ação não suportada em system: {action}",
+                exit_code=2,
+            )
+        except Exception as exc:
             return ToolResult(success=False, error=str(exc), exit_code=1)

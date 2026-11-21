@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
@@ -13,7 +14,7 @@ from rich.table import Table
 from kernelis import __version__
 from kernelis.config import KernelisConfig
 from kernelis.core.agent import ExecutionReport, KernelisAgent
-from kernelis.core.planner import ExecutionPlan
+from kernelis.core.planner import ExecutionPlan, PlanStep
 
 app = typer.Typer(
     name="kernelis",
@@ -23,7 +24,7 @@ app = typer.Typer(
 console = Console()
 
 
-def _render_report(report: ExecutionReport) -> None:
+def _render_report(report: ExecutionReport, json_out: Path | None = None) -> None:
     table = Table(title=f"Relatório Kernelis — {report.objective}")
     table.add_column("Etapa", style="cyan")
     table.add_column("Ferramenta", style="magenta")
@@ -32,7 +33,11 @@ def _render_report(report: ExecutionReport) -> None:
     table.add_column("Verificação")
 
     for item in report.steps:
-        exec_status = "[green]OK[/green]" if item.result.success else f"[red]FALHA ({item.result.exit_code})[/red]"
+        if item.result.success:
+            exec_status = "[green]OK[/green]"
+        else:
+            exec_status = f"[red]FALHA ({item.result.exit_code})[/red]"
+
         ver_status = (
             f"[green]PASS[/green] ({item.verification.message})"
             if item.verification.passed
@@ -47,12 +52,30 @@ def _render_report(report: ExecutionReport) -> None:
         )
 
     console.print(table)
-    status_panel = (
-        Panel("[bold green]TAREFA CONCLUÍDA E VERIFICADA[/bold green]", border_style="green")
-        if report.success
-        else Panel("[bold red]TAREFA FALHOU NA EXECUÇÃO OU VERIFICAÇÃO[/bold red]", border_style="red")
-    )
-    console.print(status_panel)
+    if report.success:
+        panel = Panel(
+            "[bold green]TAREFA CONCLUÍDA E VERIFICADA[/bold green]",
+            border_style="green",
+        )
+    else:
+        panel = Panel(
+            "[bold red]TAREFA FALHOU NA EXECUÇÃO OU VERIFICAÇÃO[/bold red]",
+            border_style="red",
+        )
+    console.print(panel)
+
+    if json_out is not None:
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        json_out.write_text(
+            json.dumps(report.to_dict(), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        console.print(f"[dim]Relatório JSON salvo em: {json_out}[/dim]")
+
+
+def _confirm_step(step: PlanStep) -> bool:
+    prompt = f"Executar [{step.id}] {step.tool}.{step.action} ({step.description})?"
+    return typer.confirm(prompt)
 
 
 @app.command()
@@ -74,9 +97,17 @@ def doctor() -> None:
 
 @app.command()
 def run(
-    objective: str = typer.Argument(..., help="Objetivo técnico a ser planejado, executado e verificado."),
-    auto: bool = typer.Option(False, "--auto", help="Executa sem solicitar confirmação manual."),
+    objective: str = typer.Argument(
+        ...,
+        help="Objetivo técnico a ser planejado, executado e verificado.",
+    ),
+    auto: bool = typer.Option(False, "--auto", help="Executa sem confirmação manual."),
     mock: bool = typer.Option(False, "--mock", help="Usa provedor mock local para dry-run."),
+    json_out: Path | None = typer.Option(
+        None,
+        "--json-out",
+        help="Salva o relatório estruturado em JSON.",
+    ),
 ) -> None:
     """Planeja, executa e verifica uma tarefa técnica usando o agente."""
     config = KernelisConfig.from_env()
@@ -86,20 +117,27 @@ def run(
         config.provider = "mock"
 
     agent = KernelisAgent(config=config)
-
-    def confirm(step) -> bool:
-        return typer.confirm(f"Executar [{step.id}] {step.tool}.{step.action} ({step.description})?")
-
-    report = agent.run(objective, confirm_callback=confirm if config.policy == "confirm" else None)
-    _render_report(report)
+    callback = _confirm_step if config.policy == "confirm" else None
+    report = agent.run(objective, confirm_callback=callback)
+    _render_report(report, json_out=json_out)
     if not report.success:
         raise typer.Exit(code=1)
 
 
 @app.command()
 def playbook(
-    file: Path = typer.Argument(..., exists=True, readable=True, help="Arquivo YAML com etapas e verificações."),
-    auto: bool = typer.Option(False, "--auto", help="Executa sem solicitar confirmação manual."),
+    file: Path = typer.Argument(
+        ...,
+        exists=True,
+        readable=True,
+        help="Arquivo YAML com etapas e verificações.",
+    ),
+    auto: bool = typer.Option(False, "--auto", help="Executa sem confirmação manual."),
+    json_out: Path | None = typer.Option(
+        None,
+        "--json-out",
+        help="Salva o relatório estruturado em JSON.",
+    ),
 ) -> None:
     """Executa e verifica um playbook técnico declarativo em YAML."""
     config = KernelisConfig.from_env()
@@ -109,12 +147,9 @@ def playbook(
     data = yaml.safe_load(file.read_text(encoding="utf-8"))
     plan = ExecutionPlan.from_dict(data)
     agent = KernelisAgent(config=config)
-
-    def confirm(step) -> bool:
-        return typer.confirm(f"Executar [{step.id}] {step.tool}.{step.action} ({step.description})?")
-
-    report = agent.execute_plan(plan, confirm_callback=confirm if config.policy == "confirm" else None)
-    _render_report(report)
+    callback = _confirm_step if config.policy == "confirm" else None
+    report = agent.execute_plan(plan, confirm_callback=callback)
+    _render_report(report, json_out=json_out)
     if not report.success:
         raise typer.Exit(code=1)
 

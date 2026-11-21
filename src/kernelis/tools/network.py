@@ -36,14 +36,22 @@ class NetworkTool(BaseTool):
             if action == "dns_lookup":
                 host = str(params.get("host", "")).strip()
                 if not host:
-                    return ToolResult(success=False, error="Parâmetro 'host' é obrigatório.", exit_code=2)
+                    return ToolResult(
+                        success=False,
+                        error="Parâmetro 'host' é obrigatório.",
+                        exit_code=2,
+                    )
                 ip = socket.gethostbyname(host)
                 return ToolResult(success=True, output=ip, metadata={"host": host, "ip": ip})
 
             if action == "http_check":
                 url = str(params.get("url", "")).strip()
                 if not url:
-                    return ToolResult(success=False, error="Parâmetro 'url' é obrigatório.", exit_code=2)
+                    return ToolResult(
+                        success=False,
+                        error="Parâmetro 'url' é obrigatório.",
+                        exit_code=2,
+                    )
                 timeout = float(params.get("timeout", 5.0))
                 resp = httpx.get(url, timeout=timeout, follow_redirects=True)
                 ok = 200 <= resp.status_code < 400
@@ -54,6 +62,10 @@ class NetworkTool(BaseTool):
                     metadata={"url": url, "status_code": resp.status_code},
                 )
 
-            return ToolResult(success=False, error=f"Ação não suportada em network: {action}", exit_code=2)
-        except Exception as exc:  # noqa: BLE001
+            return ToolResult(
+                success=False,
+                error=f"Ação não suportada em network: {action}",
+                exit_code=2,
+            )
+        except Exception as exc:
             return ToolResult(success=False, error=str(exc), exit_code=1)

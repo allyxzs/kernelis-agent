@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+
 import httpx
 
 from kernelis.config import KernelisConfig
@@ -12,7 +13,13 @@ from kernelis.llm.base import LLMProvider
 class OpenAICompatibleProvider(LLMProvider):
     """Cliente leve compatível com OpenAI API e Ollama (/v1/chat/completions)."""
 
-    def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 60.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        timeout: float = 60.0,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model

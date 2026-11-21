@@ -35,7 +35,8 @@ def main() -> None:
     report = agent.execute_plan(plan)
     print(f"Objetivo: {report.objective} | Sucesso: {report.success}")
     for step in report.steps:
-        print(f" - {step.step.id}: verified={step.verification.passed} ({step.verification.message})")
+        msg = f"verified={step.verification.passed} ({step.verification.message})"
+        print(f" - {step.step.id}: {msg}")
 
 
 if __name__ == "__main__":

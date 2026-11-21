@@ -38,6 +38,12 @@ class Verifier:
     def __init__(self, base_dir: Path | None = None) -> None:
         self.base_dir = (base_dir or Path.cwd()).resolve()
 
+    def _resolve_target(self, raw_path: str) -> Path:
+        target_path = Path(raw_path)
+        if not target_path.is_absolute():
+            target_path = self.base_dir / target_path
+        return target_path
+
     def verify(self, spec: VerificationSpec, result: ToolResult) -> VerificationResult:
         check = spec.type
 
@@ -69,9 +75,7 @@ class Verifier:
             )
 
         if check == "file_exists":
-            target_path = Path(spec.target or str(spec.expected))
-            if not target_path.is_absolute():
-                target_path = self.base_dir / target_path
+            target_path = self._resolve_target(spec.target or str(spec.expected))
             passed = target_path.exists()
             return VerificationResult(
                 passed=passed,
@@ -79,12 +83,37 @@ class Verifier:
                 message=f"arquivo '{target_path}' {'encontrado' if passed else 'ausente'}",
             )
 
+        if check == "file_contains":
+            target_path = self._resolve_target(spec.target)
+            if not target_path.exists():
+                return VerificationResult(
+                    passed=False,
+                    check_type=check,
+                    message=f"arquivo '{target_path}' ausente",
+                )
+            needle = str(spec.expected)
+            content = target_path.read_text(encoding="utf-8")
+            passed = needle in content
+            return VerificationResult(
+                passed=passed,
+                check_type=check,
+                message=f"arquivo {'contém' if passed else 'não contém'} '{needle}'",
+            )
+
         if check == "json_valid":
             try:
                 json.loads(result.output)
-                return VerificationResult(passed=True, check_type=check, message="saída JSON válida")
+                return VerificationResult(
+                    passed=True,
+                    check_type=check,
+                    message="saída JSON válida",
+                )
             except json.JSONDecodeError as exc:
-                return VerificationResult(passed=False, check_type=check, message=f"JSON inválido: {exc}")
+                return VerificationResult(
+                    passed=False,
+                    check_type=check,
+                    message=f"JSON inválido: {exc}",
+                )
 
         if check == "port_open":
             host, _, port_str = (spec.target or "127.0.0.1:80").partition(":")
@@ -109,8 +138,12 @@ class Verifier:
                     check_type=check,
                     message=f"HTTP {resp.status_code} em {url} (esperado={expected_status})",
                 )
-            except Exception as exc:  # noqa: BLE001
-                return VerificationResult(passed=False, check_type=check, message=f"erro HTTP: {exc}")
+            except Exception as exc:
+                return VerificationResult(
+                    passed=False,
+                    check_type=check,
+                    message=f"erro HTTP: {exc}",
+                )
 
         return VerificationResult(
             passed=False,
